@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.snouhaud.agenda",
+  "name": "Agenda",
+  "version": "1.0.0",
+  "author": "Stéphane Nouhaud (snouhaud)",
+  "license": "MIT",
+  "description": "Shows your next meeting in the bar and the coming days' agenda in a popup, from a published ICS calendar link (Outlook / Microsoft 365, Google, iCloud…).",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Agenda",
+    "description": "Next meeting in the bar, upcoming events and join links in a popup.",
+    "category": "Time",
+    "allowMultiple": false,
+    "defaultSection": "centerBegin",
+    "defaults": {
+      "icsUrl": "",
+      "refreshMinutes": 5,
+      "daysAhead": 7,
+      "showNextInBar": true,
+      "barLookaheadHours": 12,
+      "maxTitleChars": 28,
+      "hideFree": false,
+      "hideCancelled": true,
+      "alertMinutes": 5
+    },
+    "schema": [
+      {
+        "key": "icsUrl",
+        "type": "string",
+        "label": "Calendar ICS link",
+        "defaultValue": "",
+        "description": "Outlook on the web → Settings → Calendar → Shared calendars → Publish a calendar → ICS link. Anyone with this link can read the calendar."
+      },
+      {
+        "key": "refreshMinutes",
+        "type": "integer",
+        "label": "Refresh interval (minutes)",
+        "min": 1,
+        "max": 120,
+        "step": 1,
+        "defaultValue": 5
+      },
+      {
+        "key": "daysAhead",
+        "type": "integer",
+        "label": "Days shown in the popup",
+        "min": 1,
+        "max": 31,
+        "step": 1,
+        "defaultValue": 7
+      },
+      {
+        "key": "showNextInBar",
+        "type": "boolean",
+        "label": "Show the next meeting in the bar",
+        "defaultValue": true
+      },
+      {
+        "key": "barLookaheadHours",
+        "type": "integer",
+        "label": "Show it in the bar when it starts within (hours)",
+        "min": 1,
+        "max": 48,
+        "step": 1,
+        "defaultValue": 12
+      },
+      {
+        "key": "maxTitleChars",
+        "type": "integer",
+        "label": "Maximum title length in the bar",
+        "min": 8,
+        "max": 80,
+        "step": 1,
+        "defaultValue": 28
+      },
+      {
+        "key": "hideFree",
+        "type": "boolean",
+        "label": "Hide events marked as free",
+        "defaultValue": false
+      },
+      {
+        "key": "hideCancelled",
+        "type": "boolean",
+        "label": "Hide cancelled events",
+        "defaultValue": true
+      },
+      {
+        "key": "alertMinutes",
+        "type": "integer",
+        "label": "Highlight the bar this many minutes before a meeting",
+        "min": 0,
+        "max": 60,
+        "step": 1,
+        "defaultValue": 5
+      }
+    ]
+  }
+}
