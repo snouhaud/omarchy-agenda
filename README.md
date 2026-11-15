@@ -24,9 +24,9 @@ or any other calendar that can publish an ICS feed.
 omarchy plugin add https://github.com/snouhaud/omarchy-agenda.git --enable
 ```
 
-Omarchy asks where to put the widget (default: `centerBegin`, just left of the
-clock). Move it later with
-`omarchy bar move io.github.snouhaud.agenda --section <section>`.
+Omarchy asks where to put the widget (default: beside the clock, in
+`centerEnd`). To have it just left of the clock instead, run
+`omarchy bar move io.github.snouhaud.agenda --section centerBegin`.
 
 Requires only `python3` (standard library) and `xdg-open`, both present on
 Omarchy.

@@ -17,7 +17,7 @@
     "description": "Next meeting in the bar, upcoming events and join links in a popup.",
     "category": "Time",
     "allowMultiple": false,
-    "defaultSection": "centerBegin",
+    "defaultSection": "center",
     "defaults": {
       "icsUrl": "",
       "refreshMinutes": 5,
