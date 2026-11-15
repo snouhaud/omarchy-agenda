@@ -45,7 +45,11 @@ Your organisation may have disabled publishing.
 
 > Anyone who has this link can read your calendar. Keep it private.
 
-Then put it in the widget's entry in `~/.config/omarchy/shell.json`:
+Then paste it in the settings screen: open the agenda and click the cog (or
+the "No calendar link" alert, or press `s`). The link is hidden while you type;
+the eye button shows it, and Enter saves it.
+
+You can also put it in the widget's entry in `~/.config/omarchy/shell.json`:
 
 ```json
 { "id": "io.github.snouhaud.agenda", "icsUrl": "https://outlook.office365.com/owa/calendar/…/calendar.ics" }
@@ -54,6 +58,13 @@ Then put it in the widget's entry in `~/.config/omarchy/shell.json`:
 The shell reloads `shell.json` on save.
 
 ## Settings
+
+The settings screen (cog in the popup, `s`, or
+`omarchy-shell io.github.snouhaud.agenda openSettings`) sets the ICS link and
+the number of days shown. Each change is saved at once to the widget's entry
+in `~/.config/omarchy/shell.json`, through `omarchy bar set`. The other keys
+are set in `shell.json` by hand, or with
+`omarchy bar set io.github.snouhaud.agenda <key> <value>`:
 
 | Key                 | Default | Meaning                                                    |
 |---------------------|---------|------------------------------------------------------------|
@@ -78,6 +89,7 @@ The shell reloads `shell.json` on save.
 | Enter or `j`          | Join the selected meeting                 |
 | `r`                   | Refresh                                   |
 | `o`                   | Open Outlook on the web                   |
+| `s` or `,`            | Settings (ICS link, days shown)           |
 
 From a script or a key binding:
 
@@ -86,6 +98,7 @@ omarchy-shell io.github.snouhaud.agenda joinNext   # join the meeting starting w
 omarchy-shell io.github.snouhaud.agenda next       # "<ISO start>\t<title>" of the next meeting
 omarchy-shell io.github.snouhaud.agenda refresh
 omarchy-shell io.github.snouhaud.agenda toggle
+omarchy-shell io.github.snouhaud.agenda openSettings
 ```
 
 ## How it works
@@ -112,6 +125,7 @@ only `https://` links to known meeting hosts are passed to `xdg-open`.
 
 ```bash
 python3 -I tests/test_feed.py
+python3 -I tests/test_static.py
 ```
 
 ## Uninstall

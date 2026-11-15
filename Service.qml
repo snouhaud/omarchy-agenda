@@ -19,6 +19,14 @@ Item {
   property string lastError: ""
   property string lastErrorDetail: ""
   property double now: Date.now()
+  // A change of link or days while a download runs: fetch again after it.
+  property bool refreshQueued: false
+
+  // Settings saved from the settings screen but not yet back from shell.json.
+  property var overrides: ({})
+  property var saveQueue: []
+  property string saveError: ""
+  readonly property string widgetId: "io.github.snouhaud.agenda"
 
   readonly property bool refreshing: feedProcess.running
   readonly property string helperPath: decodeURIComponent(String(Qt.resolvedUrl("agenda-feed.py")).replace(/^file:\/\//, ""))
@@ -59,6 +67,7 @@ Item {
   }
 
   function setting(name, fallback) {
+    if (overrides && overrides[name] !== undefined) return overrides[name]
     var value = settings ? settings[name] : undefined
     return value === undefined || value === null ? fallback : value
   }
@@ -90,7 +99,7 @@ Item {
   function refresh() {
     now = Date.now()
     if (!configured) { loaded = true; events = []; setError("", ""); return }
-    if (feedProcess.running) return
+    if (feedProcess.running) { refreshQueued = true; return }
     feedProcess.command = ["python3", "-I", helperPath, icsUrl, String(daysAhead)]
     feedProcess.running = true
   }
@@ -147,7 +156,46 @@ Item {
     Quickshell.execDetached(["xdg-open", "https://outlook.office.com/calendar/view/week"])
   }
 
-  onIcsUrlChanged: Qt.callLater(refresh)
+  // ------------------------------------------------------------ settings
+
+  // Writes one setting of this widget to shell.json through `omarchy-bar set`
+  // (argv only). The value shows at once; shell.json catches up on reload.
+  function saveSetting(key, value) {
+    var next = {}
+    for (var k in overrides) next[k] = overrides[k]
+    next[key] = value
+    overrides = next
+    var isJson = typeof value !== "string"
+    var cmd = ["omarchy-bar", "set", widgetId, key, isJson ? JSON.stringify(value) : String(value)]
+    if (isJson) cmd.push("--json")
+    saveQueue = saveQueue.concat([cmd])
+    saveError = ""
+    runSaveQueue()
+  }
+
+  function runSaveQueue() {
+    if (saveProcess.running || saveQueue.length === 0) return
+    saveProcess.command = saveQueue[0]
+    saveQueue = saveQueue.slice(1)
+    saveProcess.running = true
+  }
+
+  // Drops the pending values shell.json now holds, so a later hand edit of
+  // shell.json is never masked.
+  function pruneOverrides() {
+    if (Object.keys(overrides).length === 0) return
+    var next = {}
+    var kept = false
+    for (var k in overrides) {
+      var saved = settings ? settings[k] : undefined
+      if (JSON.stringify(saved) !== JSON.stringify(overrides[k])) { next[k] = overrides[k]; kept = true }
+    }
+    overrides = kept ? next : ({})
+  }
+
+  onSettingsChanged: pruneOverrides()
+
+  onIcsUrlChanged: { events = []; calendarName = ""; Qt.callLater(refresh) }
   onDaysAheadChanged: Qt.callLater(refresh)
 
   Timer {
@@ -173,6 +221,25 @@ Item {
     onExited: function(exitCode) {
       if (exitCode === 0) root.apply(feedOut.text)
       else { root.loaded = true; root.setError("helperFailed", "exit " + exitCode) }
+      if (root.refreshQueued) { root.refreshQueued = false; Qt.callLater(root.refresh) }
+    }
+  }
+
+  Process {
+    id: saveProcess
+    running: false
+    command: []
+    stderr: StdioCollector { id: saveErr; waitForEnd: true }
+    onExited: function(exitCode) {
+      if (exitCode !== 0) {
+        // Not saved: show the value shell.json really has.
+        root.saveError = root.clip(saveErr.text, 200).trim() || ("exit " + exitCode)
+        var next = {}
+        for (var k in root.overrides) if (k !== String(saveProcess.command[3])) next[k] = root.overrides[k]
+        root.overrides = next
+      }
+      root.pruneOverrides()
+      root.runSaveQueue()
     }
   }
 }

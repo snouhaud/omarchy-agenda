@@ -18,6 +18,8 @@ Panel {
 
   property bool cursorActive: false
   property int cursorPos: 0
+  // The settings screen replaces the agenda while true.
+  property bool settingsMode: false
 
   readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
   readonly property color urgent: bar ? bar.urgent : Commons.Color.urgent
@@ -25,7 +27,7 @@ Panel {
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property var formatLocale: Qt.locale(Commons.I18n.formatLocale)
 
-  readonly property bool showNextInBar: setting("showNextInBar", true) !== false
+  readonly property bool showNextInBar: agenda.setting("showNextInBar", true) !== false
   readonly property int barLookaheadHours: agenda.intSetting("barLookaheadHours", 12, 1, 48)
   readonly property int maxTitleChars: agenda.intSetting("maxTitleChars", 28, 8, 80)
   readonly property int alertMinutes: agenda.intSetting("alertMinutes", 5, 0, 60)
@@ -37,8 +39,11 @@ Panel {
   readonly property string glyphRefresh: String.fromCodePoint(0xF0450)     // refresh
   readonly property string glyphWeb: String.fromCodePoint(0xF03CC)         // open-in-new
   readonly property string glyphAlert: String.fromCodePoint(0xF002A)       // alert-outline
+  readonly property string glyphSettings: String.fromCodePoint(0xF0493)    // cog
 
   Strings { id: strings; directory: Qt.resolvedUrl("i18n") }
+  readonly property var catalog: strings
+  readonly property var service: agenda
 
   Service {
     id: agenda
@@ -243,12 +248,30 @@ Panel {
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
+  function openSettings() {
+    settingsMode = true
+    if (panelFlick) panelFlick.contentY = 0
+    Qt.callLater(function() { if (panel.loadedContent) panel.loadedContent.focusSettings() })
+  }
+
+  function closeSettings() {
+    settingsMode = false
+    if (panelFlick) panelFlick.contentY = 0
+    Qt.callLater(function() { if (panel.loadedContent) panel.loadedContent.forceActiveFocus() })
+  }
+
   onOpenedChanged: if (opened) {
     cursorActive = false
     cursorPos = 0
     agenda.now = Date.now()
     if (panelFlick) panelFlick.contentY = 0
-    Qt.callLater(function() { if (panel.loadedContent) panel.loadedContent.forceActiveFocus() })
+    Qt.callLater(function() {
+      if (!panel.loadedContent) return
+      if (settingsMode) panel.loadedContent.focusSettings()
+      else panel.loadedContent.forceActiveFocus()
+    })
+  } else {
+    settingsMode = false
   }
   onFlatEventsChanged: if (cursorPos >= flatEvents.length) cursorPos = Math.max(0, flatEvents.length - 1)
 
@@ -260,6 +283,7 @@ Panel {
     function hide(): void { root.close() }
     function toggle(): void { root.toggle() }
     function refresh(): string { agenda.refresh(); return "ok" }
+    function openSettings(): void { root.openSettings(); root.open() }
     function next(): string {
       var e = agenda.nextEvent(48, 15)
       return e ? new Date(e.start).toISOString() + "\t" + e.title : ""
@@ -303,6 +327,13 @@ Panel {
       property alias panelFlick: panelFlick
       implicitHeight: column.implicitHeight
       anchors.fill: parent
+      blocked: root.settingsMode
+
+      // With no link yet, the settings open on the link field.
+      function focusSettings() {
+        if (agenda.configured) settingsPage.forceActiveFocus()
+        else settingsPage.focusUrl()
+      }
 
       function rowAt(index) {
         for (var d = 0; d < dayRepeater.count; d++) {
@@ -324,6 +355,7 @@ Panel {
       onTextKey: function(t) {
         if (t === "r" || t === "R") agenda.refresh()
         else if (t === "o" || t === "O") { agenda.openWeb(); root.close() }
+        else if (t === "s" || t === "S" || t === ",") root.openSettings()
         else if (t === "j" || t === "J") {
           var e = root.cursorEvent || root.barEvent
           if (e) agenda.join(e)
@@ -349,6 +381,7 @@ Panel {
           PanelHero {
             id: hero
             width: parent.width
+            visible: !root.settingsMode
             title: agenda.calendarName !== "" && agenda.calendarName !== "Calendrier" && agenda.calendarName !== "Calendar"
               ? strings.t("title") + " · " + agenda.calendarName : strings.t("title")
             meta: root.heroMeta()
@@ -374,6 +407,13 @@ Panel {
                   onClicked: { agenda.openWeb(); root.close() }
                 }
                 PanelActionButton {
+                  iconText: root.glyphSettings
+                  tooltipText: strings.t("settings.open")
+                  foreground: hero.foreground
+                  fontFamily: hero.fontFamily
+                  onClicked: root.openSettings()
+                }
+                PanelActionButton {
                   iconText: root.glyphRefresh
                   tooltipText: strings.t("refresh")
                   foreground: hero.foreground
@@ -385,102 +425,130 @@ Panel {
             }
           }
 
-          // Not configured yet.
-          CursorSurface {
-            visible: agenda.loaded && !agenda.configured
+          // The agenda; the settings screen takes its place.
+          Column {
+            id: listPart
             width: parent.width
-            foreground: root.urgent
-            bordered: true
-            implicitHeight: setupLayout.implicitHeight + Style.spacing.rowPaddingX
+            spacing: Style.space(12)
+            visible: !root.settingsMode
 
-            RowLayout {
-              id: setupLayout
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.verticalCenter: parent.verticalCenter
-              anchors.leftMargin: Style.space(10)
-              anchors.rightMargin: Style.space(10)
-              spacing: Style.space(8)
+            // Not configured yet.
+            CursorSurface {
+              visible: agenda.loaded && !agenda.configured
+              width: parent.width
+              foreground: root.urgent
+              bordered: true
+              implicitHeight: setupLayout.implicitHeight + Style.spacing.rowPaddingX
 
-              Text {
-                textFormat: Text.PlainText
-                text: root.glyphAlert
-                color: root.urgent
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.heading
-                Layout.alignment: Qt.AlignVCenter
-              }
-              ColumnLayout {
-                Layout.fillWidth: true
-                spacing: Style.space(1)
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.openSettings()
+            }
+
+              RowLayout {
+                id: setupLayout
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.leftMargin: Style.space(10)
+                anchors.rightMargin: Style.space(10)
+                spacing: Style.space(8)
+
                 Text {
                   textFormat: Text.PlainText
-                  Layout.fillWidth: true
-                  text: strings.t("alert.noUrl")
+                  text: root.glyphAlert
                   color: root.urgent
                   font.family: root.fontFamily
-                  font.pixelSize: Style.font.body
-                  wrapMode: Text.WordWrap
+                  font.pixelSize: Style.font.heading
+                  Layout.alignment: Qt.AlignVCenter
                 }
-                Text {
-                  textFormat: Text.PlainText
+                ColumnLayout {
                   Layout.fillWidth: true
-                  text: strings.t("alert.noUrlHelp")
-                  color: root.dim
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.caption
-                  wrapMode: Text.WordWrap
+                  spacing: Style.space(1)
+                  Text {
+                    textFormat: Text.PlainText
+                    Layout.fillWidth: true
+                    text: strings.t("alert.noUrl")
+                    color: root.urgent
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                    wrapMode: Text.WordWrap
+                  }
+                  Text {
+                    textFormat: Text.PlainText
+                    Layout.fillWidth: true
+                    text: strings.t("alert.noUrlHelp")
+                    color: root.dim
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    wrapMode: Text.WordWrap
+                  }
                 }
               }
             }
-          }
 
-          Text {
-            textFormat: Text.PlainText
-            visible: text !== ""
-            width: parent.width
-            text: root.errorText()
-            color: root.urgent
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.bodySmall
-            wrapMode: Text.WordWrap
-          }
+            Text {
+              textFormat: Text.PlainText
+              visible: text !== ""
+              width: parent.width
+              text: root.errorText()
+              color: root.urgent
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              wrapMode: Text.WordWrap
+            }
 
-          Repeater {
-            id: dayRepeater
-            model: agenda.configured && agenda.lastError === "" || agenda.events.length > 0 ? root.days : []
+            Repeater {
+              id: dayRepeater
+              model: agenda.configured && agenda.lastError === "" || agenda.events.length > 0 ? root.days : []
 
-            DayGroup {
-              required property var modelData
-              required property int index
-              width: column.width
-              day: modelData
-              dayIndex: index
+              DayGroup {
+                required property var modelData
+                required property int index
+                width: column.width
+                day: modelData
+                dayIndex: index
+              }
+            }
+
+            Text {
+              textFormat: Text.PlainText
+              visible: agenda.configured && agenda.loaded && root.flatEvents.length === 0 && agenda.lastError === ""
+              width: parent.width
+              text: strings.t("nothingAhead")
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+              horizontalAlignment: Text.AlignHCenter
+              wrapMode: Text.WordWrap
+            }
+
+            Text {
+              textFormat: Text.PlainText
+              visible: text !== ""
+              width: parent.width
+              text: root.heroDetail()
+              color: agenda.stale ? root.urgent : root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              horizontalAlignment: Text.AlignRight
+              elide: Text.ElideRight
             }
           }
 
-          Text {
-            textFormat: Text.PlainText
-            visible: agenda.configured && agenda.loaded && root.flatEvents.length === 0 && agenda.lastError === ""
+          SettingsPage {
+            id: settingsPage
             width: parent.width
-            text: strings.t("nothingAhead")
-            color: root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.body
-            horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.WordWrap
-          }
-
-          Text {
-            textFormat: Text.PlainText
-            visible: text !== ""
-            width: parent.width
-            text: root.heroDetail()
-            color: agenda.stale ? root.urgent : root.dim
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            horizontalAlignment: Text.AlignRight
-            elide: Text.ElideRight
+            visible: root.settingsMode
+            // Through root: inside this element, "agenda" would name its own property.
+            agenda: root.service
+            strings: root.catalog
+            foreground: root.foreground
+            dim: root.dim
+            urgent: root.urgent
+            fontFamily: root.fontFamily
+            onBack: root.closeSettings()
           }
         }
       }
