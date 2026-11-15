@@ -67,7 +67,7 @@ def cache_path(url):
 
 
 def fetch(url):
-    req = urllib.request.Request(url, headers={"User-Agent": "omarchy-agenda/1.0", "Accept": "text/calendar"})
+    req = urllib.request.Request(url, headers={"User-Agent": "omarchy-agenda/1.1", "Accept": "text/calendar"})
     with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT) as resp:
         data = resp.read(MAX_FEED_BYTES + 1)
     if len(data) > MAX_FEED_BYTES:
