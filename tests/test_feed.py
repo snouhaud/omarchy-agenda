@@ -178,12 +178,71 @@ class FeedTests(unittest.TestCase):
         self.assertEqual(days("FREQ=YEARLY;BYDAY=-1SU;BYMONTH=3;COUNT=2"), ["2026-03-29", "2027-03-28"])
         self.assertEqual(days("FREQ=DAILY;COUNT=3;BYDAY=MO,TU,WE,TH,FR"), ["2026-01-02", "2026-01-05", "2026-01-06"])
 
-    def test_bad_url_is_rejected(self):
+    def run_helper(self, args, stdin):
         import subprocess
         script = os.path.join(HERE, "..", "agenda-feed.py")
-        out = subprocess.run([sys.executable, "-I", script, "http://example.invalid/cal.ics", "7"],
-                             capture_output=True, text=True, timeout=10).stdout
+        return subprocess.run([sys.executable, "-I", script, *args], input=stdin,
+                              capture_output=True, text=True, timeout=15).stdout
+
+    def test_bad_url_is_rejected(self):
+        out = self.run_helper(["7"], '{"url": "http://example.invalid/cal.ics"}\n')
         self.assertIn('"error":"badUrl"', out)
+
+    def test_url_is_not_accepted_in_argv(self):
+        # The old argv form must fail, so the secret link cannot leak there.
+        out = self.run_helper(["https://example.invalid/cal.ics", "7"], "")
+        self.assertIn('"error":"usage"', out)
+        out = self.run_helper(["7"], '"https://example.invalid/cal.ics"\n')
+        self.assertIn('"error":"usage"', out)
+
+
+class CacheTests(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.TemporaryDirectory()
+        self.folder = os.path.join(self.tmp.name, "omarchy-agenda")
+        self.path = os.path.join(self.folder, "feed.ics")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_round_trip_is_private(self):
+        feed.write_cache(self.folder, self.path, b"BEGIN:VCALENDAR")
+        self.assertEqual(os.stat(self.folder).st_mode & 0o777, 0o700)
+        self.assertEqual(os.stat(self.path).st_mode & 0o777, 0o600)
+        self.assertEqual(feed.read_cache(self.folder, self.path)[0], b"BEGIN:VCALENDAR")
+        self.assertEqual(os.listdir(self.folder), ["feed.ics"])
+
+    def test_open_folder_is_tightened(self):
+        os.mkdir(self.folder, 0o777)
+        os.chmod(self.folder, 0o777)
+        feed.write_cache(self.folder, self.path, b"x")
+        self.assertEqual(os.stat(self.folder).st_mode & 0o777, 0o700)
+
+    def test_symlinked_folder_is_refused(self):
+        elsewhere = os.path.join(self.tmp.name, "elsewhere")
+        os.mkdir(elsewhere)
+        os.symlink(elsewhere, self.folder)
+        with self.assertRaises(PermissionError):
+            feed.write_cache(self.folder, self.path, b"x")
+        self.assertEqual(os.listdir(elsewhere), [])
+
+    def test_planted_symlinks_are_not_followed(self):
+        victim = os.path.join(self.tmp.name, "victim")
+        with open(victim, "wb") as f:
+            f.write(b"keep")
+        os.mkdir(self.folder, 0o700)
+        # A planted cache file is replaced, not written through.
+        os.symlink(victim, self.path)
+        feed.write_cache(self.folder, self.path, b"new")
+        with open(victim, "rb") as f:
+            self.assertEqual(f.read(), b"keep")
+        self.assertFalse(os.path.islink(self.path))
+        # And a symlink is never read as the cache.
+        os.unlink(self.path)
+        os.symlink(victim, self.path)
+        with self.assertRaises(OSError):
+            feed.read_cache(self.folder, self.path)
 
 
 if __name__ == "__main__":

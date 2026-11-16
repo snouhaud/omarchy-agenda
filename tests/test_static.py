@@ -36,6 +36,11 @@ class StaticTests(unittest.TestCase):
         self.assertNotIn('"sh"', src)
         self.assertNotIn('"bash"', src)
 
+    def test_ics_link_goes_over_stdin(self):
+        src = read("Service.qml")
+        self.assertNotIn("helperPath, icsUrl", src)
+        self.assertIn("stdinEnabled: true", src)
+
 
 if __name__ == "__main__":
     unittest.main()

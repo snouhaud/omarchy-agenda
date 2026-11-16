@@ -2,8 +2,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Runs agenda-feed.py (argv only, never a shell string) and keeps the
-// validated, bounded list of events. `now` ticks every 30 s so labels such
+// Runs agenda-feed.py (argv only, never a shell string; the ICS link goes
+// over stdin) and keeps the validated, bounded list of events. `now` ticks every 30 s so labels such
 // as "in 5 min" stay current between downloads.
 Item {
   id: root
@@ -100,7 +100,9 @@ Item {
     now = Date.now()
     if (!configured) { loaded = true; events = []; setError("", ""); return }
     if (feedProcess.running) { refreshQueued = true; return }
-    feedProcess.command = ["python3", "-I", helperPath, icsUrl, String(daysAhead)]
+    // The ICS link is a secret: it goes over stdin, never argv (readable in /proc).
+    feedProcess.payload = JSON.stringify({ url: icsUrl })
+    feedProcess.command = ["python3", "-I", helperPath, String(daysAhead)]
     feedProcess.running = true
   }
 
@@ -215,9 +217,16 @@ Item {
 
   Process {
     id: feedProcess
+    // One JSON line for the helper's stdin, written once it has started.
+    property string payload: ""
     running: false
     command: []
+    stdinEnabled: true
     stdout: StdioCollector { id: feedOut; waitForEnd: true }
+    onStarted: {
+      write(payload + "\n")
+      payload = ""
+    }
     onExited: function(exitCode) {
       if (exitCode === 0) root.apply(feedOut.text)
       else { root.loaded = true; root.setError("helperFailed", "exit " + exitCode) }

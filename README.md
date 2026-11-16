@@ -104,7 +104,8 @@ omarchy-shell io.github.snouhaud.agenda openSettings
 ## How it works
 
 `agenda-feed.py` downloads the feed (HTTPS only, 25 s timeout, 30 MB cap),
-caches it under `~/.cache/omarchy-agenda/` (mode 600) and prints the events of
+caches it under `~/.cache/omarchy-agenda/` (a private 700 folder, files
+600, written through a random temporary file and an atomic rename) and prints the events of
 the coming days as one JSON line. It uses only the Python standard library
 and handles what Outlook publishes:
 
@@ -117,8 +118,9 @@ and handles what Outlook publishes:
 - all-day events, busy status (free / tentative / out of office), cancelled
   events.
 
-The QML side never runs a shell: the helper gets its arguments as argv, its
-output is validated and bounded, every text is displayed as plain text, and
+The QML side never runs a shell: the helper gets its arguments as argv and
+the ICS link over stdin (never on its command line, where other local
+accounts could read it in `/proc`), its output is validated and bounded, every text is displayed as plain text, and
 only `https://` links to known meeting hosts are passed to `xdg-open`.
 
 ## Tests

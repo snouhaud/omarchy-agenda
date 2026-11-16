@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
 """Fetch an iCalendar (ICS) feed and print the events of the coming days as JSON.
 
-Usage: agenda-feed.py <https-url> <days-ahead>
+Usage: agenda-feed.py <days-ahead>   stdin: {"url": "<https-url>"}
+
+The ICS link is a bearer secret (anyone holding it reads the calendar), so it
+is read from stdin and never appears on the command line, where other local
+accounts could see it in /proc/<pid>/cmdline.
 
 Standard library only. Handles what Outlook / Microsoft 365 publishes:
 Windows time zone names described by VTIMEZONE blocks, weekly/monthly/yearly
 RRULEs, EXDATE and moved or edited occurrences (RECURRENCE-ID).
 
-The feed is cached under $XDG_CACHE_HOME so the agenda still shows when the
-network is down; the reply then carries "stale": true.
+The feed is cached under $XDG_CACHE_HOME/omarchy-agenda so the agenda still
+shows when the network is down; the reply then carries "stale": true. That
+folder must be a real directory owned by the user and private (0700); it is
+written through a random temporary file and an atomic rename, and the cache
+file is never followed if it is a symlink.
 
 Always prints exactly one JSON line on stdout and exits 0, so the caller only
 has to parse it. Nothing from the feed is ever executed or passed to a shell.
@@ -20,7 +27,10 @@ import hashlib
 import json
 import os
 import re
+import select
+import stat
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -29,6 +39,7 @@ MAX_FEED_BYTES = 30 * 1024 * 1024
 MAX_EVENTS = 400
 MAX_TEXT = 200
 FETCH_TIMEOUT = 25
+STDIN_TIMEOUT = 10
 
 UTC = dt.timezone.utc
 
@@ -77,16 +88,56 @@ def fetch(url):
     return data
 
 
+def private_folder(folder):
+    """Create `folder` (0700) if needed and check it is a private directory of ours.
+
+    Refuses a symlink, a non-directory or a folder owned by someone else, and
+    tightens our own folder to 0700, so no other account can plant or read
+    files in it."""
+    try:
+        os.makedirs(folder, mode=0o700, exist_ok=True)
+    except FileExistsError:
+        pass
+    st = os.lstat(folder)
+    if not stat.S_ISDIR(st.st_mode) or st.st_uid != os.getuid():
+        raise PermissionError("cache folder is not a private directory")
+    if stat.S_IMODE(st.st_mode) & 0o077:
+        os.chmod(folder, 0o700)
+    return folder
+
+
+def write_cache(folder, path, data):
+    private_folder(folder)
+    fd, tmp = tempfile.mkstemp(prefix=".feed-", suffix=".tmp", dir=folder)  # 0600, O_EXCL
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def read_cache(folder, path):
+    private_folder(folder)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd, "rb") as f:
+        if not stat.S_ISREG(os.fstat(f.fileno()).st_mode):
+            raise OSError("cache entry is not a regular file")
+        return f.read(MAX_FEED_BYTES + 1), os.fstat(f.fileno()).st_mtime
+
+
 def load_feed(url):
     folder, path = cache_path(url)
     try:
         data = fetch(url)
-        os.makedirs(folder, mode=0o700, exist_ok=True)
-        tmp = path + ".tmp"
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "wb") as f:
-            f.write(data)
-        os.replace(tmp, path)
+        try:
+            write_cache(folder, path, data)
+        except OSError:
+            pass  # no cache this time; the fresh feed still shows
         return data, time.time(), False, ""
     except Exception as exc:  # network down, HTTP error, bad content
         reason = exc.__class__.__name__
@@ -97,9 +148,8 @@ def load_feed(url):
         elif isinstance(exc, ValueError):
             reason = str(exc)
         try:
-            with open(path, "rb") as f:
-                data = f.read(MAX_FEED_BYTES + 1)
-            return data, os.path.getmtime(path), True, reason
+            data, mtime = read_cache(folder, path)
+            return data, mtime, True, reason
         except OSError:
             fail("fetchFailed", reason)
 
@@ -621,10 +671,24 @@ def collect(root, window_start, window_end):
     return out[:MAX_EVENTS]
 
 
+def read_url():
+    """The ICS link, from one JSON line on stdin: {"url": "..."}."""
+    ready, _, _ = select.select([sys.stdin], [], [], STDIN_TIMEOUT)
+    if not ready:
+        fail("usage", "no input on stdin")
+    try:
+        obj = json.loads(sys.stdin.readline(8192))
+    except ValueError:
+        fail("usage", "bad input on stdin")
+    if not isinstance(obj, dict) or not isinstance(obj.get("url"), str):
+        fail("usage", "bad input on stdin")
+    return obj["url"].strip()
+
+
 def main(argv):
-    if len(argv) != 3:
+    if len(argv) != 2:
         fail("usage")
-    url = argv[1].strip()
+    url = read_url()
     if url.lower().startswith("webcal://"):
         url = "https://" + url[len("webcal://"):]
     if not url:
@@ -632,7 +696,7 @@ def main(argv):
     if not re.fullmatch(r"https://[^\s]{4,2040}", url):
         fail("badUrl")
     try:
-        days_ahead = max(1, min(60, int(argv[2])))
+        days_ahead = max(1, min(60, int(argv[1])))
     except ValueError:
         days_ahead = 7
 
