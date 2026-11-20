@@ -30,6 +30,8 @@
   "error.badUrl": "The calendar link must start with https://",
   "error.parseFailed": "Could not read the calendar",
   "error.helperFailed": "The calendar helper failed",
+  "error.noUrl": "The calendar link is empty",
+  "error.usage": "The calendar helper was called the wrong way (restart the shell after an update: omarchy restart shell)",
   "error.generic": "Calendar error",
   "settings.open": "Settings",
   "settings.title": "Settings",

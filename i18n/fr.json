@@ -30,6 +30,8 @@
   "error.badUrl": "Le lien du calendrier doit commencer par https://",
   "error.parseFailed": "Impossible de lire le calendrier",
   "error.helperFailed": "Le script du calendrier a échoué",
+  "error.noUrl": "Le lien du calendrier est vide",
+  "error.usage": "Le script du calendrier a été mal appelé (après une mise à jour, redémarre le shell : omarchy restart shell)",
   "error.generic": "Erreur de calendrier",
   "settings.open": "Réglages",
   "settings.title": "Réglages",
