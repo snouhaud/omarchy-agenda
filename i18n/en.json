@@ -45,6 +45,7 @@
   "settings.urlHelp": "Outlook on the web: Settings → Calendar → Shared calendars → Publish a calendar → ICS link. Google Calendar: calendar settings → Secret address in iCal format. Anyone with this link can read the calendar. Press Enter to save.",
   "settings.days": "Days shown",
   "settings.dayCount": { "one": "%1 day", "other": "%1 days" },
+  "settings.barLength": "Title length in the bar",
   "settings.saveFailed": "Setting not saved: %1",
   "settings.savedIn": "Saved in ~/.config/omarchy/shell.json."
 }

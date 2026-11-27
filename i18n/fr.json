@@ -45,6 +45,7 @@
   "settings.urlHelp": "Outlook web : Paramètres → Calendrier → Calendriers partagés → Publier un calendrier → lien ICS. Google Agenda : Paramètres de l'agenda → Adresse secrète au format iCal. Toute personne qui a ce lien peut lire l'agenda. Entrée pour enregistrer.",
   "settings.days": "Jours affichés",
   "settings.dayCount": { "one": "%1 jour", "other": "%1 jours" },
+  "settings.barLength": "Longueur du titre dans la barre",
   "settings.saveFailed": "Réglage non enregistré : %1",
   "settings.savedIn": "Enregistré dans ~/.config/omarchy/shell.json."
 }

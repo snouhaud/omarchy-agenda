@@ -29,7 +29,7 @@ Panel {
 
   readonly property bool showNextInBar: agenda.setting("showNextInBar", true) !== false
   readonly property int barLookaheadHours: agenda.intSetting("barLookaheadHours", 12, 1, 48)
-  readonly property int maxTitleChars: agenda.intSetting("maxTitleChars", 28, 8, 80)
+  readonly property int maxTitleChars: agenda.intSetting("maxTitleChars", 28, 4, 120)
   readonly property int alertMinutes: agenda.intSetting("alertMinutes", 5, 0, 60)
 
   // Nerd Font (Material Design) glyphs.

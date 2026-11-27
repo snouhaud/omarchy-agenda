@@ -175,6 +175,24 @@ FocusScope {
       onChanged: function(v) { agenda.saveSetting("daysAhead", parseInt(v, 10)) }
     }
 
+    // -------------------------------------------------- bar
+
+    PanelSectionHeader {
+      text: strings.t("settings.barLength")
+      foreground: page.foreground
+      fontFamily: page.fontFamily
+    }
+
+    NumberField {
+      // Typed in, or stepped with the arrows: 4 to 120 characters.
+      foreground: page.foreground
+      fontFamily: page.fontFamily
+      from: 4
+      to: 120
+      value: agenda.intSetting("maxTitleChars", 28, 4, 120)
+      onModified: function(v) { agenda.saveSetting("maxTitleChars", v) }
+    }
+
     Text {
       textFormat: Text.PlainText
       width: parent.width

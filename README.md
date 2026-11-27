@@ -73,7 +73,7 @@ are set in `shell.json` by hand, or with
 | `daysAhead`         | `7`     | Days shown in the popup                                    |
 | `showNextInBar`     | `true`  | Show the next meeting in the bar (else only an icon)       |
 | `barLookaheadHours` | `12`    | Show it only when it starts within this many hours         |
-| `maxTitleChars`     | `28`    | Title length in the bar                                    |
+| `maxTitleChars`     | `28`    | Title length in the bar, in characters (4 to 120)          |
 | `alertMinutes`      | `5`     | Alert color this many minutes before a meeting (0 = never) |
 | `hideFree`          | `false` | Hide events marked as free                                 |
 | `hideCancelled`     | `true`  | Hide cancelled events                                      |
